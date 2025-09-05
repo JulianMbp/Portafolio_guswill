@@ -27,6 +27,8 @@ function Layout() {
                   <Dropdown.Item href="/ejercicio4">Agrupacion de Objetos - React</Dropdown.Item>
                   <Dropdown.Item href="/ejercicio5">Agrupacion de Objetos - Three.js</Dropdown.Item>
                   <Dropdown.Item href="/luces">Luces</Dropdown.Item>
+                  <Dropdown.Item href="/sombras">Sombras</Dropdown.Item>
+                  <Dropdown.Item href="/efectos">Efectos</Dropdown.Item>
                 </Dropdown.Menu>
               </Dropdown>
               <Dropdown>
@@ -49,8 +51,8 @@ function Layout() {
         fluid
         className="flex-grow-1 p-4"
         style={{
-          backgroundColor: "black", 
-          color: "white",          
+          backgroundColor: "black",
+          color: "white",
         }}
       >
         <AnimatePresence mode="wait">

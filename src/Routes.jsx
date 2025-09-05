@@ -4,7 +4,9 @@ import Ejercicio2 from "./pages/Ejercicio2";
 import Ejercicio3 from "./pages/Ejercicio3";
 import Ejercicio4 from "./pages/Ejercicio4";
 import Ejercicio5 from "./pages/Ejercicio5";
-import Inicio from "./pages/Inicio";
+import Luces from "./pages/Luces";
+import Sombras from "./pages/Sombras";
+import Efectos from "./pages/Efectos";
 import Laboratorio1 from "./pages/Laboratorio1";
 import Laboratorio2 from "./pages/Laboratorio2";
 import Luces from "./pages/Luces";
@@ -20,6 +22,8 @@ const routes = [
   { path: "ejercicio4", element: <Ejercicio4 /> },
   { path: "ejercicio5", element: <Ejercicio5 /> },
   { path: "luces", element: <Luces /> },
+  { path: "sombras", element: <Sombras /> },
+  { path: "efectos", element: <Efectos /> },
   { path: "laboratorio1", element: <Laboratorio1 /> },
   { path: "laboratorio2", element: <Laboratorio2 /> },
   { path: "laboratorio3", element: <Laboratorio3 /> }, // Laboratorio 3

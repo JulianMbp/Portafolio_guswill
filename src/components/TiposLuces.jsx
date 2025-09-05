@@ -41,29 +41,22 @@ const ThreeScene = () => {
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         mountRef.current.appendChild(renderer.domElement);
 
-/*
-########################Codigo de prueba
-*/
+        // Agregar el modelo GLB a la escena
+        scene.add(gltf.scene);
 
-// Agregar el modelo GLB a la escena
-scene.add(gltf.scene);
+        // Asegurar que el modelo se renderice con las luces y sombras
+        gltf.scene.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
 
-// Asegurar que el modelo se renderice con las luces y sombras
-gltf.scene.traverse((child) => {
-    if (child.isMesh) {
-        child.castShadow = true;
-        child.receiveShadow = true;
-    }
-});
-
-// Posicionar el modelo en la escena (ajústalo según sea necesario)
-gltf.scene.position.set(0.5, -0.7, -1);
-gltf.scene.scale.set(0.3, 0.3, 0.3);
-/**
- * ##########################Fin codigo de prueba */
+        // Posicionar el modelo en la escena
+        gltf.scene.position.set(0.5, -0.7, -1);
+        gltf.scene.scale.set(0.3, 0.3, 0.3);
 
 
-        
         /**
          * Lights
          */
@@ -132,7 +125,14 @@ gltf.scene.scale.set(0.3, 0.3, 0.3);
          * GUI (Lil-GUI)
          */
         const gui = new GUI();
-        gui.add(ambientLight, 'intensity').min(0).max(3).step(0.001);
+        // Luz ambiental: intensidad y color
+        gui.add(ambientLight, "intensity", 0, 3, 0.1).name("Ambient Intensity");
+        gui.addColor({ color: ambientLight.color.getHex() }, "color")
+            .name("Ambient Color")
+            .onChange((value) => ambientLight.color.set(value));
+
+        // Luz puntual: intensidad
+        gui.add(pointLight, "intensity", 0, 5, 0.1).name("Point Intensity");
 
         /**
          * Resize Handling
@@ -148,7 +148,6 @@ gltf.scene.scale.set(0.3, 0.3, 0.3);
             renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         };
         window.addEventListener('resize', handleResize);
-
 
 
         /**
