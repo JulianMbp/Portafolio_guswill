@@ -8,7 +8,7 @@ function Layout() {
   return (
     <div className="d-flex flex-column vh-100">
       {/* Cabecera fija */}
-      <Navbar expand="lg" bg="dark" variant="dark"> {/* 🔥 Navbar también en oscuro */}
+      <Navbar expand="lg" bg="dark" variant="dark"> 
         <Container fluid>
           <Navbar.Brand href="#">Portafolio</Navbar.Brand>
           <Navbar.Toggle aria-controls="navbarSupportedContent" />
@@ -29,6 +29,9 @@ function Layout() {
                   <Dropdown.Item href="/luces">Luces</Dropdown.Item>
                   <Dropdown.Item href="/sombras">Sombras</Dropdown.Item>
                   <Dropdown.Item href="/efectos">Efectos</Dropdown.Item>
+                  <Dropdown.Item href="/efectos2">Refactorización Casa</Dropdown.Item>
+                  <Dropdown.Item href="/particulas">Particulas</Dropdown.Item>
+                  <Dropdown.Item href="/fisicas">Físicas</Dropdown.Item>
                 </Dropdown.Menu>
               </Dropdown>
               <Dropdown>

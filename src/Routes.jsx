@@ -7,6 +7,9 @@ import Ejercicio5 from "./pages/Ejercicio5";
 import Luces from "./pages/Luces";
 import Sombras from "./pages/Sombras";
 import Efectos from "./pages/Efectos";
+import Efectos2 from "./pages/EfectosOrg";
+import Particulas from "./pages/Particulas";
+import Fisicas from "./pages/Fisicas";
 import Laboratorio1 from "./pages/Laboratorio1";
 import Laboratorio2 from "./pages/Laboratorio2";
 import Luces from "./pages/Luces";
@@ -24,6 +27,9 @@ const routes = [
   { path: "luces", element: <Luces /> },
   { path: "sombras", element: <Sombras /> },
   { path: "efectos", element: <Efectos /> },
+  { path: "efectos2", element: <Efectos2 /> },
+  { path: "particulas", element: <Particulas /> },
+  { path: "fisicas", element: <Fisicas /> },
   { path: "laboratorio1", element: <Laboratorio1 /> },
   { path: "laboratorio2", element: <Laboratorio2 /> },
   { path: "laboratorio3", element: <Laboratorio3 /> }, // Laboratorio 3
