@@ -1,4 +1,6 @@
 // src/app/router.jsx
+import React from "react";
+import Inicio from "./pages/Inicio";
 import Ejercicio1 from "./pages/Ejercicio1";
 import Ejercicio2 from "./pages/Ejercicio2";
 import Ejercicio3 from "./pages/Ejercicio3";
@@ -8,11 +10,7 @@ import Luces from "./pages/Luces";
 import Sombras from "./pages/Sombras";
 import Efectos from "./pages/Efectos";
 import Laboratorio1 from "./pages/Laboratorio1";
-import Laboratorio2 from "./pages/Laboratorio2";
-import Luces from "./pages/Luces";
 
-
-import Laboratorio3 from "./pages/Laboratorio3";
 
 const routes = [
   { path: "/", element: <Inicio />, index: true },
@@ -25,8 +23,7 @@ const routes = [
   { path: "sombras", element: <Sombras /> },
   { path: "efectos", element: <Efectos /> },
   { path: "laboratorio1", element: <Laboratorio1 /> },
-  { path: "laboratorio2", element: <Laboratorio2 /> },
-  { path: "laboratorio3", element: <Laboratorio3 /> }, // Laboratorio 3
+
 ];
 
 export default routes;
