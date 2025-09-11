@@ -9,6 +9,9 @@ import Ejercicio5 from "./pages/Ejercicio5";
 import Luces from "./pages/Luces";
 import Sombras from "./pages/Sombras";
 import Efectos from "./pages/Efectos";
+import Efectos2 from "./pages/EfectosOrg";
+import Particulas from "./pages/Particulas";
+import Fisicas from "./pages/Fisicas";
 import Laboratorio1 from "./pages/Laboratorio1";
 
 
@@ -22,6 +25,9 @@ const routes = [
   { path: "luces", element: <Luces /> },
   { path: "sombras", element: <Sombras /> },
   { path: "efectos", element: <Efectos /> },
+  { path: "efectos2", element: <Efectos2 /> },
+  { path: "particulas", element: <Particulas /> },
+  { path: "fisicas", element: <Fisicas /> },
   { path: "laboratorio1", element: <Laboratorio1 /> },
 
 ];
