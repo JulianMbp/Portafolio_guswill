@@ -1,32 +1,49 @@
-import React, { useEffect, useRef } from 'react';
+import * as CANNON from 'cannon-es';
+import GUI from 'lil-gui';
+import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import GUI from 'lil-gui';
-import * as CANNON from 'cannon-es';
 
+// Componente principal que monta una escena THREE + motor físico cannon-es
 const EscenarioCannon = () => {
+    // ref al contenedor DOM donde se incrustará el canvas del renderer
     const mountRef = useRef(null);
 
     useEffect(() => {
+        // Si el ref no está disponible, salir
         if (!mountRef.current) return;
+        // Guardamos una copia local del mount para usar en el cleanup (evita problemas si cambia la ref)
+        const currentMount = mountRef.current;
 
-        const gui = new GUI();
-        const debugObject = {};
+    // Creamos la GUI (lil-gui) y un objeto para exponer controles
+    const gui = new GUI();
+    const debugObject = {};
+    // valores por defecto para parámetros ajustables
+    debugObject.impulseStrength = 1.4; // fuerza para iniciar la cadena
+    debugObject.particleSize = 0.015; // tamaño de las partículas
 
+    // ...existing code...
+        // === SCENE (THREE) ===
+        // Creamos la escena donde añadiremos meshes y luces
         const scene = new THREE.Scene();
 
-        /** 🔊 Sonido */
+        // === SONIDO DE IMPACTO ===
+        // Preparamos un audio simple para reproducir cuando haya colisiones fuertes
         const hitSound = new Audio('/sounds/hit.mp3');
+        // Función que reproduce sonido según la fuerza del impacto
         const playHitSound = (collision) => {
+            // impactStrength: magnitud del impacto a lo largo de la normal del contacto
             const impactStrength = collision.contact.getImpactVelocityAlongNormal();
+            // Si la fuerza excede un umbral, reproducir sonido
             if (impactStrength > 1.5) {
-                hitSound.volume = Math.random();
-                hitSound.currentTime = 0;
+                hitSound.volume = Math.random(); // volumen aleatorio para variar
+                hitSound.currentTime = 0; // reiniciar sonido si estaba reproduciéndose
                 hitSound.play();
             }
         };
 
-        /** 🎨 Cargar mapa de entorno */
+        // === MAPA DE ENTORNO ===
+        // Cargamos un environment map (cubo) para mejorar materiales
         const cubeTextureLoader = new THREE.CubeTextureLoader();
         const environmentMapTexture = cubeTextureLoader.load([
             '/textures/environmentMaps/0/px.png',
@@ -36,79 +53,93 @@ const EscenarioCannon = () => {
             '/textures/environmentMaps/0/pz.png',
             '/textures/environmentMaps/0/nz.png'
         ]);
-
-        // Asignar el mapa de entorno global
+        // Asignamos textura de entorno como background y environment (iluminación PBR)
         scene.background = environmentMapTexture;
         scene.environment = environmentMapTexture;
 
-        /** Mundo físico */
+        // === MUNDO FÍSICO (CANNON) ===
         const world = new CANNON.World();
+        // SAPBroadphase para mejores resultados cuando hay muchos cuerpos estáticos
         world.broadphase = new CANNON.SAPBroadphase(world);
-        world.allowSleep = true;
-        world.gravity.set(0, -9.82, 0);
+        world.allowSleep = true; // habilitar sleep para mejorar rendimiento
+        world.gravity.set(0, -9.82, 0); // gravedad estándar
 
+        // Material físico por defecto y contacto
         const defaultMaterial = new CANNON.Material('default');
         const defaultContactMaterial = new CANNON.ContactMaterial(
             defaultMaterial,
             defaultMaterial,
-            { friction: 0.01, restitution: 0.6 }
+            { friction: 0.01, restitution: 0.6 } // fricción y restitución por defecto
         );
         world.addContactMaterial(defaultContactMaterial);
         world.defaultContactMaterial = defaultContactMaterial;
 
+        // Exponemos parámetros físicos en la GUI para poder ajustarlos en tiempo real
+        debugObject.friction = defaultContactMaterial.friction;
+        debugObject.restitution = defaultContactMaterial.restitution;
+        gui.add(debugObject, 'friction').min(0).max(1).step(0.01).name('Fricción').onChange((v) => {
+            // actualizar fricción del contact material al mover el slider
+            defaultContactMaterial.friction = v;
+        });
+        gui.add(debugObject, 'restitution').min(0).max(1).step(0.01).name('Rebote').onChange((v) => {
+            // actualizar restitución (bounciness)
+            defaultContactMaterial.restitution = v;
+        });
+        // controles para la fuerza del impulso y el tamaño de partículas
+        gui.add(debugObject, 'impulseStrength').min(0).max(5).step(0.1).name('Impulso');
+        gui.add(debugObject, 'particleSize').min(0.005).max(0.05).step(0.005).name('Tamaño Part.');
+
+        // === SUELO FÍSICO ===
+        // Plane en cannon (cuerpo inmóvil)
         const floorShape = new CANNON.Plane();
-        const floorBody = new CANNON.Body({ mass: 0 });
+        const floorBody = new CANNON.Body({ mass: 0 }); // masa 0 => objeto estático
         floorBody.addShape(floorShape);
+        // Rotamos el plano para que quede horizontal (cannon usa X,Y,Z distintos)
         floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(-1, 0, 0), Math.PI * 0.5);
         world.addBody(floorBody);
 
-        /** 🟫 Piso */
+        // === SUELO VISUAL (THREE) ===
         const floor = new THREE.Mesh(
             new THREE.PlaneGeometry(10, 10),
-            new THREE.MeshStandardMaterial({
-                color: '#777777',
-                metalness: 0.6,
-                roughness: 0.3,
-                envMapIntensity: 1
-            })
+            new THREE.MeshStandardMaterial({ color: '#777777', metalness: 0.6, roughness: 0.3, envMapIntensity: 1 })
         );
-        floor.receiveShadow = true;
-        floor.rotation.x = -Math.PI * 0.5;
+        floor.receiveShadow = true; // recibe sombras
+        floor.rotation.x = -Math.PI * 0.5; // rotamos para coincidir con el plano físico
         scene.add(floor);
 
-        /** Luces */
+        // === LUCES ===
         const ambientLight = new THREE.AmbientLight(0xffffff, 2.1);
         scene.add(ambientLight);
+        // Exponemos intensidad de luz ambiental en la GUI
         gui.add(ambientLight, 'intensity').min(0).max(3).step(0.1).name('Amb. Light');
 
         const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
-        directionalLight.castShadow = true;
+        directionalLight.castShadow = true; // emite sombras
         directionalLight.shadow.mapSize.set(1024, 1024);
         directionalLight.shadow.camera.far = 15;
         directionalLight.position.set(5, 5, 5);
         scene.add(directionalLight);
 
-        /** 🎥 Cámara */
-        const sizes = {
-            width: window.innerWidth,
-            height: window.innerHeight
-        };
-
+        // === CÁMARA ===
+        const sizes = { width: window.innerWidth, height: window.innerHeight };
         const camera = new THREE.PerspectiveCamera(75, sizes.width / sizes.height, 0.1, 100);
-        camera.position.set(-3, 3, 3);
+        camera.position.set(-3, 3, 3); // posición inicial de cámara
         scene.add(camera);
 
-        /** 🖼️ Renderer */
+        // === RENDERER ===
         const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.enabled = true; // habilitar sombras
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         renderer.setSize(sizes.width, sizes.height);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        mountRef.current.appendChild(renderer.domElement);
+        // añadimos el canvas al contenedor del componente (usamos currentMount guardado arriba)
+        currentMount.appendChild(renderer.domElement);
 
+        // Controles de órbita para poder mover la cámara con el ratón
         const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
+        controls.enableDamping = true; // suavizado
 
+        // Manejo del resize de ventana: actualiza cámara y renderer
         const handleResize = () => {
             sizes.width = window.innerWidth;
             sizes.height = window.innerHeight;
@@ -119,17 +150,57 @@ const EscenarioCannon = () => {
         };
         window.addEventListener('resize', handleResize);
 
-        /** Objetos dinámicos */
+        // === OBJETOS DINÁMICOS Y PARTICULAS ===
+        // Lista de objetos (mesh + body) para sincronizar en el loop
         const objectsToUpdate = [];
+        // Lista de partículas (pequeños meshes temporales) para simular efecto visual
+        const particles = [];
 
+        // Función auxiliar: crea una partícula visual en una posición, con color opcional
+    // Añadimos lifetime para controlar cuánto tiempo permanece la partícula
+    const addParticle = (position, color = 0xffaa00, lifetime = 0.8) => {
+            // geom/material más delicados para la partícula
+            const size = typeof debugObject.particleSize === 'number' ? debugObject.particleSize : 0.015;
+            const geom = new THREE.SphereGeometry(size, 6, 6);
+            const mat = new THREE.MeshStandardMaterial({
+                color,
+                emissive: color, // emite algo de luz
+                emissiveIntensity: 0.6,
+                transparent: true,
+                opacity: 1,
+                metalness: 0.1,
+                roughness: 0.4
+            });
+            const mesh = new THREE.Mesh(geom, mat);
+            mesh.position.copy(position); // colocamos la partícula en la posición indicada
+            // le guardamos velocidad/vida para actualizarla en el tick
+            mesh.userData = {
+                // velocidades más suaves para partículas delicadas
+                velocity: new THREE.Vector3((Math.random() - 0.5) * 0.6, Math.random() * 1 + 0.3, (Math.random() - 0.5) * 0.6),
+                lifetime: lifetime, // duración configurable
+                age: 0
+            };
+            scene.add(mesh);
+            particles.push(mesh); // añadir a la lista para su actualización y eventual eliminación
+        };
+
+        // Crea varias partículas alrededor de un punto (emisor simple). Se puede especificar lifetime
+        const spawnParticles = (point, count = 12, color = 0xffaa00, lifetime = 0.8) => {
+            for (let i = 0; i < count; i++) {
+                // jitter más pequeño para dispersión más delicada
+                const jitter = new THREE.Vector3((Math.random() - 0.5) * 0.04, (Math.random() - 0.5) * 0.04, (Math.random() - 0.5) * 0.04);
+                const pos = new THREE.Vector3(point.x + jitter.x, point.y + jitter.y, point.z + jitter.z);
+                addParticle(pos, color, lifetime);
+            }
+        };
+
+        // === GEOMETRÍAS Y CREADORES DE OBJETOS ===
+        // Reutilizamos geometrías y materiales para eficiencia
         const sphereGeometry = new THREE.SphereGeometry(1, 20, 20);
-        const sphereMaterial = new THREE.MeshStandardMaterial({
-            metalness: 0.7,
-            roughness: 0.2,
-            envMapIntensity: 1
-        });
+        const sphereMaterial = new THREE.MeshStandardMaterial({ metalness: 0.7, roughness: 0.2, envMapIntensity: 1 });
 
-        const createSphere = (radius, position) => {
+        // Ahora createSphere acepta opciones: { emitParticles: boolean }
+        const createSphere = (radius, position, options = {}) => {
             const mesh = new THREE.Mesh(sphereGeometry, sphereMaterial);
             mesh.scale.set(radius, radius, radius);
             mesh.castShadow = true;
@@ -144,20 +215,26 @@ const EscenarioCannon = () => {
                 material: defaultMaterial
             });
             body.position.copy(position);
-            body.addEventListener('collide', playHitSound);
+            // Registrar flag en el body para saber si debe emitir partículas al colisionar
+            body.userData = { emitParticles: options.emitParticles === true };
+            body.addEventListener('collide', (e) => {
+                playHitSound(e);
+                // Si el objeto fue creado con emitParticles, generamos partículas y las mantenemos unos segundos
+                if (body.userData && body.userData.emitParticles) {
+                    // partículas más duraderas para objetos que caen
+                    spawnParticles(body.position, Math.min(30, Math.floor(radius * 60)), 0x66ccff, 2.5);
+                }
+            });
             world.addBody(body);
 
             objectsToUpdate.push({ mesh, body });
         };
 
         const boxGeometry = new THREE.BoxGeometry(1, 1, 1);
-        const boxMaterial = new THREE.MeshStandardMaterial({
-            metalness: 0.7,
-            roughness: 0.3,
-            envMapIntensity: 1
-        });
+        const boxMaterial = new THREE.MeshStandardMaterial({ metalness: 0.7, roughness: 0.3, envMapIntensity: 1 });
 
-        const createBox = (width, height, depth, position) => {
+        // createBox ahora acepta opciones: { emitParticles: boolean }
+        const createBox = (width, height, depth, position, options = {}) => {
             const mesh = new THREE.Mesh(boxGeometry, boxMaterial);
             mesh.scale.set(width, height, depth);
             mesh.castShadow = true;
@@ -172,7 +249,14 @@ const EscenarioCannon = () => {
                 material: defaultMaterial
             });
             body.position.copy(position);
-            body.addEventListener('collide', playHitSound);
+            // Registrar flag en el body para saber si debe emitir partículas al colisionar
+            body.userData = { emitParticles: options.emitParticles === true };
+            body.addEventListener('collide', (e) => {
+                playHitSound(e);
+                if (body.userData && body.userData.emitParticles) {
+                    spawnParticles(body.position, Math.min(30, Math.floor((width + height + depth) * 30)), 0xffaa00, 2.5);
+                }
+            });
             world.addBody(body);
 
             objectsToUpdate.push({ mesh, body });
@@ -195,59 +279,130 @@ const EscenarioCannon = () => {
         gui.add(debugObject, 'createSphere').name('+ Crear Esfera');
         gui.add(debugObject, 'createBox').name('- Crear Caja');
 
-        /** 🔷 Cubo controlable con colores */
-        const playerSize = { x: 0.5, y: 0.5, z: 0.5 };
-        const playerGeometry = new THREE.BoxGeometry(playerSize.x, playerSize.y, playerSize.z);
+        // --- Actividades físicas con cannon-es ---
+        const createDominoWall = ({ count = 18, spacing = 0.12, startPos = { x: -1, y: 0, z: 0 } } = {}) => {
+            // Dominós delgados y en posición para reposar sobre el plano (startPos.y = 0)
+            // w = ancho (en X), h = altura (en Y), d = profundidad (en Z)
+            const w = 0.12; // ancho delgado
+            const h = 0.6;  // altura razonable
+            const d = 0.2; // profundidad pequeña
+            for (let i = 0; i < count; i++) {
+                const x = startPos.x + i * (w + spacing);
+                const y = startPos.y + h / 2; // colocar la base sobre el plano
+                const z = startPos.z;
+                const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), boxMaterial);
+                mesh.scale.set(w, h, d);
+                // No rotamos en Y: orientamos la cara delgada en Z y la anchura en X
+                mesh.rotation.y = 0;
+                // Marca visual para identificarlo en el raycast
+                mesh.userData.isDomino = true;
+                mesh.castShadow = true;
+                mesh.position.set(x, y, z);
+                scene.add(mesh);
 
-        const playerMaterials = [
-            new THREE.MeshStandardMaterial({ color: 'red', metalness: 0.5, roughness: 0.3 }),
-            new THREE.MeshStandardMaterial({ color: 'green', metalness: 0.5, roughness: 0.3 }),
-            new THREE.MeshStandardMaterial({ color: 'blue', metalness: 0.5, roughness: 0.3 }),
-            new THREE.MeshStandardMaterial({ color: 'yellow', metalness: 0.5, roughness: 0.3 }),
-            new THREE.MeshStandardMaterial({ color: 'purple', metalness: 0.5, roughness: 0.3 }),
-            new THREE.MeshStandardMaterial({ color: 'cyan', metalness: 0.5, roughness: 0.3 })
-        ];
+                const shape = new CANNON.Box(new CANNON.Vec3(w / 2, h / 2, d / 2));
+                // Masa moderada para que caigan con facilidad pero tengan inercia
+                const body = new CANNON.Body({ mass: 0.6, material: defaultMaterial });
+                body.addShape(shape);
+                // Posicionar el cuerpo para que su base toque el plano
+                body.position.set(x, y, z);
+                // Mantener estable al inicio: permitir sleep y algo de damping
+                body.allowSleep = true;
+                body.sleepSpeedLimit = 0.1;
+                body.linearDamping = 0.01;
+                body.angularDamping = 0.4;
+                // Guardar altura para uso al aplicar impulso
+                body.userData = Object.assign(body.userData || {}, { isDomino: true, dominoHeight: h });
+                // Poner a dormir para que no caigan al crearse
+                body.velocity.set(0, 0, 0);
+                body.angularVelocity.set(0, 0, 0);
+                body.sleep();
+                body.addEventListener('collide', (e) => {
+                    playHitSound(e);
+                    // Partículas de dominó con mayor duración para que no desaparezcan tan rápido
+                    spawnParticles(body.position, 12, 0xff66, 2.0);
+                });
+                world.addBody(body);
+                objectsToUpdate.push({ mesh, body });
+            }
+        };
 
-        const playerMesh = new THREE.Mesh(playerGeometry, playerMaterials);
-        playerMesh.castShadow = true;
-        scene.add(playerMesh);
+        const spawnFallingObjects = ({ count = 8, area = 1.8 } = {}) => {
+            for (let i = 0; i < count; i++) {
+                const x = (Math.random() - 0.5) * area;
+                const y = 2 + Math.random() * 2;
+                const z = (Math.random() - 0.5) * area;
+                if (Math.random() > 0.5) {
+                    // Estos objetos deben emitir partículas al colisionar y permanecer un tiempo
+                    createBox(0.2 + Math.random() * 0.6, 0.2 + Math.random() * 0.6, 0.2 + Math.random() * 0.6, { x, y, z }, { emitParticles: true });
+                } else {
+                    createSphere(0.15 + Math.random() * 0.5, { x, y, z }, { emitParticles: true });
+                }
+            }
+        };
 
-        const playerShape = new CANNON.Box(new CANNON.Vec3(
-            playerSize.x / 2,
-            playerSize.y / 2,
-            playerSize.z / 2
-        ));
-        const playerBody = new CANNON.Body({
-            mass: 5,
-            material: defaultMaterial,
-            position: new CANNON.Vec3(0, 1, 0),
-        });
-        playerBody.angularFactor.set(0, 0, 0);
-        playerBody.addShape(playerShape);
-        world.addBody(playerBody);
+        debugObject.activity1 = () => createDominoWall();
+        debugObject.activity2 = () => spawnFallingObjects();
+        // Botón para iniciar la cadena de dominós aplicando un pequeño golpe al primero
+        debugObject.startChain = () => {
+            const dominos = objectsToUpdate.filter(o => o.body && o.body.userData && o.body.userData.isDomino);
+            if (dominos.length === 0) return;
+            // Elegir el dominó con menor X (el primero en la fila)
+            let first = dominos.reduce((a, b) => (a.body.position.x < b.body.position.x ? a : b));
+            if (!first || !first.body) return;
+            // Asegurar que esté despierto
+            first.body.wakeUp();
+            const h = first.body.userData && first.body.userData.dominoHeight ? first.body.userData.dominoHeight : 0.6;
+            // Aplicar el impulso en la parte superior para generar torque
+            const applicationPoint = new CANNON.Vec3(first.body.position.x, first.body.position.y + h / 2, first.body.position.z);
+            const impulse = new CANNON.Vec3(1.4, 0, 0);
+            first.body.applyImpulse(impulse, applicationPoint);
+        };
+        gui.add(debugObject, 'activity1').name('Actividad 1: Muro Dominó');
+        gui.add(debugObject, 'activity2').name('Actividad 2: Objetos Caen');
+        gui.add(debugObject, 'startChain').name('Iniciar Cadena');
 
-        /** Controles de movimiento */
-        const keys = { forward: false, backward: false, left: false, right: false };
-        const force = 50;
+        // CAMBIO: Se ha eliminado el cubo controlable y sus listeners para que no estorbe el muro de dominós
 
-        document.addEventListener('keydown', (e) => {
-            if (e.code === 'ArrowUp') keys.forward = true;
-            if (e.code === 'ArrowDown') keys.backward = true;
-            if (e.code === 'ArrowLeft') keys.left = true;
-            if (e.code === 'ArrowRight') keys.right = true;
-        });
+        // Raycaster para detectar clicks sobre mallas (iniciar el efecto dominó)
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
 
-        document.addEventListener('keyup', (e) => {
-            if (e.code === 'ArrowUp') keys.forward = false;
-            if (e.code === 'ArrowDown') keys.backward = false;
-            if (e.code === 'ArrowLeft') keys.left = false;
-            if (e.code === 'ArrowRight') keys.right = false;
-        });
+        const onPointerDown = (event) => {
+            // Normalizar coordenadas del pointer
+            pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+            pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(pointer, camera);
+            const intersects = raycaster.intersectObjects(scene.children, true);
+            if (intersects.length > 0) {
+                // Buscar la primera malla que sea un domino
+                const hit = intersects.find(i => i.object.userData && i.object.userData.isDomino);
+                if (hit) {
+                    const mesh = hit.object;
+                    // Encontrar el objetoToUpdate que corresponde a esta malla
+                    const found = objectsToUpdate.find(o => o.mesh === mesh || o.mesh === mesh.parent);
+                    if (found && found.body) {
+                        // Despertar el cuerpo y aplicar un impulso localizado en la parte superior
+                        found.body.wakeUp();
+                        const h = found.body.userData && found.body.userData.dominoHeight ? found.body.userData.dominoHeight : 0.6;
+                        // Punto de aplicación: un poco arriba del centro para generar torque
+                        const applicationPoint = new CANNON.Vec3(found.body.position.x, found.body.position.y + h / 2, found.body.position.z);
+                        // Impulso hacia +X para que caiga hacia los demás (asumimos la fila en X creciente)
+                        const impulse = new CANNON.Vec3(1.4, 0, 0);
+                        found.body.applyImpulse(impulse, applicationPoint);
+                        // Evitar aplicarlo repetidamente por varios clicks: quitar listener después de iniciar
+                        window.removeEventListener('pointerdown', onPointerDown);
+                    }
+                }
+            }
+        };
+        window.addEventListener('pointerdown', onPointerDown);
 
         /** Animación */
         const clock = new THREE.Clock();
         let oldElapsedTime = 0;
 
+        let animationId;
         const tick = () => {
             const elapsedTime = clock.getElapsedTime();
             const deltaTime = elapsedTime - oldElapsedTime;
@@ -255,31 +410,31 @@ const EscenarioCannon = () => {
 
             world.step(1 / 60, deltaTime, 3);
 
-            // Movimiento cubo
-            const direction = new CANNON.Vec3(0, 0, 0);
-            if (keys.forward) direction.z -= 1;
-            if (keys.backward) direction.z += 1;
-            if (keys.left) direction.x -= 1;
-            if (keys.right) direction.x += 1;
-
-            if (direction.length()) {
-                direction.normalize();
-                direction.scale(force, direction);
-                playerBody.applyForce(direction, playerBody.position);
-            }
-
-            playerMesh.position.copy(playerBody.position);
-            playerMesh.quaternion.copy(playerBody.quaternion);
+            // CAMBIO: se removió la lógica del cubo controlable (player) para no interferir con el muro
 
             objectsToUpdate.forEach(object => {
                 object.mesh.position.copy(object.body.position);
                 object.mesh.quaternion.copy(object.body.quaternion);
             });
 
+            // actualizar partículas
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.userData.age += deltaTime;
+                p.userData.velocity.y -= 9.82 * deltaTime * 0.6;
+                p.position.addScaledVector(p.userData.velocity, deltaTime);
+                const remaining = Math.max(0, 1 - p.userData.age / p.userData.lifetime);
+                p.material.opacity = remaining;
+                if (p.userData.age >= p.userData.lifetime) {
+                    scene.remove(p);
+                    particles.splice(i, 1);
+                }
+            }
+
             controls.update();
             renderer.render(scene, camera);
 
-            requestAnimationFrame(tick);
+            animationId = requestAnimationFrame(tick);
         };
         tick();
 
@@ -287,7 +442,8 @@ const EscenarioCannon = () => {
         return () => {
             gui.destroy();
             window.removeEventListener('resize', handleResize);
-            if (mountRef.current) mountRef.current.removeChild(renderer.domElement);
+            if (animationId) cancelAnimationFrame(animationId);
+            if (currentMount) currentMount.removeChild(renderer.domElement);
         };
     }, []);
 
