@@ -153,42 +153,69 @@ const EscenarioCannon = () => {
         // === OBJETOS DINÁMICOS Y PARTICULAS ===
         // Lista de objetos (mesh + body) para sincronizar en el loop
         const objectsToUpdate = [];
-        // Lista de partículas (pequeños meshes temporales) para simular efecto visual
-        const particles = [];
+        // Sistema de partículas optimizado: pool de meshes reutilizables
+        const particles = []; // lista de partículas activas
+        const particlePool = [];
+        const particleMaterials = {}; // cache de materiales por color
+        const MAX_PARTICLES = 300;
+        // Geometría base (unit) para las partículas; el tamaño se ajusta por escala
+        const baseParticleGeometry = new THREE.SphereGeometry(1, 6, 6);
+        // Material por defecto usado si no hay color cacheado
+        const defaultParticleMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffaa00,
+            emissive: 0xffaa00,
+            emissiveIntensity: 0.6,
+            transparent: true,
+            opacity: 1,
+            metalness: 0.1,
+            roughness: 0.4
+        });
+        // Inicializar pool
+        for (let i = 0; i < MAX_PARTICLES; i++) {
+            const m = new THREE.Mesh(baseParticleGeometry, defaultParticleMaterial);
+            m.visible = false;
+            m.castShadow = false;
+            m.receiveShadow = false;
+            scene.add(m);
+            particlePool.push(m);
+        }
+
+        const getMaterialForColor = (hex) => {
+            const key = hex.toString(16);
+            if (particleMaterials[key]) return particleMaterials[key];
+            const mat = defaultParticleMaterial.clone();
+            mat.color.setHex(hex);
+            mat.emissive.setHex(hex);
+            particleMaterials[key] = mat;
+            return mat;
+        };
 
         // Función auxiliar: crea una partícula visual en una posición, con color opcional
     // Añadimos lifetime para controlar cuánto tiempo permanece la partícula
     const addParticle = (position, color = 0xffaa00, lifetime = 0.8) => {
-            // geom/material más delicados para la partícula
+            if (particlePool.length === 0) return; // no hay más partículas disponibles en el pool
+            const mesh = particlePool.pop();
+            // asignar material adecuado por color (cacheado)
+            mesh.material = getMaterialForColor(color);
+            // tamaño controlable por GUI (usamos escala sobre la geometría unit)
             const size = typeof debugObject.particleSize === 'number' ? debugObject.particleSize : 0.015;
-            const geom = new THREE.SphereGeometry(size, 6, 6);
-            const mat = new THREE.MeshStandardMaterial({
-                color,
-                emissive: color, // emite algo de luz
-                emissiveIntensity: 0.6,
-                transparent: true,
-                opacity: 1,
-                metalness: 0.1,
-                roughness: 0.4
-            });
-            const mesh = new THREE.Mesh(geom, mat);
-            mesh.position.copy(position); // colocamos la partícula en la posición indicada
-            // le guardamos velocidad/vida para actualizarla en el tick
+            mesh.scale.set(size, size, size);
+            mesh.position.copy(position);
+            mesh.visible = true;
             mesh.userData = {
-                // velocidades más suaves para partículas delicadas
                 velocity: new THREE.Vector3((Math.random() - 0.5) * 0.6, Math.random() * 1 + 0.3, (Math.random() - 0.5) * 0.6),
-                lifetime: lifetime, // duración configurable
+                lifetime: lifetime,
                 age: 0
             };
-            scene.add(mesh);
-            particles.push(mesh); // añadir a la lista para su actualización y eventual eliminación
+            particles.push(mesh);
         };
 
         // Crea varias partículas alrededor de un punto (emisor simple). Se puede especificar lifetime
         const spawnParticles = (point, count = 12, color = 0xffaa00, lifetime = 0.8) => {
-            for (let i = 0; i < count; i++) {
-                // jitter más pequeño para dispersión más delicada
-                const jitter = new THREE.Vector3((Math.random() - 0.5) * 0.04, (Math.random() - 0.5) * 0.04, (Math.random() - 0.5) * 0.04);
+            // limitar la cantidad para no agotar el pool y evitar lag
+            const realCount = Math.min(count, particlePool.length);
+            for (let i = 0; i < realCount; i++) {
+                const jitter = new THREE.Vector3((Math.random() - 0.5) * 0.03, (Math.random() - 0.5) * 0.03, (Math.random() - 0.5) * 0.03);
                 const pos = new THREE.Vector3(point.x + jitter.x, point.y + jitter.y, point.z + jitter.z);
                 addParticle(pos, color, lifetime);
             }
@@ -280,7 +307,7 @@ const EscenarioCannon = () => {
         gui.add(debugObject, 'createBox').name('- Crear Caja');
 
         // --- Actividades físicas con cannon-es ---
-        const createDominoWall = ({ count = 18, spacing = 0.12, startPos = { x: -1, y: 0, z: 0 } } = {}) => {
+        const createDominoWall = ({ count = 10, spacing = 0.12, startPos = { x: -1, y: 0, z: 0 } } = {}) => {
             // Dominós delgados y en posición para reposar sobre el plano (startPos.y = 0)
             // w = ancho (en X), h = altura (en Y), d = profundidad (en Z)
             const w = 0.12; // ancho delgado
@@ -417,17 +444,20 @@ const EscenarioCannon = () => {
                 object.mesh.quaternion.copy(object.body.quaternion);
             });
 
-            // actualizar partículas
+            // actualizar partículas (reutilizar desde el pool en lugar de eliminarlas)
             for (let i = particles.length - 1; i >= 0; i--) {
                 const p = particles[i];
                 p.userData.age += deltaTime;
                 p.userData.velocity.y -= 9.82 * deltaTime * 0.6;
                 p.position.addScaledVector(p.userData.velocity, deltaTime);
                 const remaining = Math.max(0, 1 - p.userData.age / p.userData.lifetime);
-                p.material.opacity = remaining;
+                if (p.material && p.material.opacity !== undefined) p.material.opacity = remaining;
                 if (p.userData.age >= p.userData.lifetime) {
-                    scene.remove(p);
+                    // reciclar la partícula: ocultar, limpiar userData y devolver al pool
+                    p.visible = false;
+                    p.userData = {};
                     particles.splice(i, 1);
+                    particlePool.push(p);
                 }
             }
 
