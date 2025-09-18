@@ -12,11 +12,14 @@ import Efectos from "./pages/Efectos";
 import Efectos2 from "./pages/EfectosOrg";
 import Particulas from "./pages/Particulas";
 import Fisicas from "./pages/Fisicas";
+import Modelos from "./pages/Modelos";
+import Raycaster from "./pages/raycaster";
 import Laboratorio1 from "./pages/Laboratorio1";
 
 
 const routes = [
   { path: "/", element: <Inicio />, index: true },
+  // Practicas 1
   { path: "ejercicio1", element: <Ejercicio1 /> },
   { path: "ejercicio2", element: <Ejercicio2 /> },
   { path: "ejercicio3", element: <Ejercicio3 /> },
@@ -28,6 +31,9 @@ const routes = [
   { path: "efectos2", element: <Efectos2 /> },
   { path: "particulas", element: <Particulas /> },
   { path: "fisicas", element: <Fisicas /> },
+  // Practicas 2
+  { path: "modelos", element: <Modelos/> },
+  { path: "raycaster", element: <Raycaster/>   },
   { path: "laboratorio1", element: <Laboratorio1 /> },
 
 ];

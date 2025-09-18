@@ -18,7 +18,7 @@ function Layout() {
               {/* Menú desplegable con React-Bootstrap */}
               <Dropdown>
                 <Dropdown.Toggle as={Nav.Link} id="dropdown-custom">
-                  Prácticas
+                  Prácticas 1
                 </Dropdown.Toggle>
                 <Dropdown.Menu>
                   <Dropdown.Item href="/ejercicio1">Geometrías</Dropdown.Item>
@@ -34,6 +34,15 @@ function Layout() {
                   <Dropdown.Item href="/fisicas">Físicas</Dropdown.Item>
                 </Dropdown.Menu>
               </Dropdown>
+              <Dropdown>
+                <Dropdown.Toggle as={Nav.Link} id="dropdown-custom">
+                  Prácticas 2
+                </Dropdown.Toggle>
+                <Dropdown.Menu>
+                  <Dropdown.Item href="/modelos">Cargar modelos en Three.js</Dropdown.Item>
+                  <Dropdown.Item href="/raycaster">Eventos de Raycaster y Mouse </Dropdown.Item>
+                </Dropdown.Menu>
+              </Dropdown>              
               <Dropdown>
                 <Dropdown.Toggle as={Nav.Link} id="dropdown-custom">
                   Laboratorio
