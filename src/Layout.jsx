@@ -41,6 +41,7 @@ function Layout() {
                 <Dropdown.Menu>
                   <Dropdown.Item href="/modelos">Cargar modelos en Three.js</Dropdown.Item>
                   <Dropdown.Item href="/raycaster">Eventos de Raycaster y Mouse </Dropdown.Item>
+                  <Dropdown.Item href="/portal">Portal</Dropdown.Item>
                 </Dropdown.Menu>
               </Dropdown>              
               <Dropdown>

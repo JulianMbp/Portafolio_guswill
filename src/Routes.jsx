@@ -14,6 +14,7 @@ import Particulas from "./pages/Particulas";
 import Fisicas from "./pages/Fisicas";
 import Modelos from "./pages/Modelos";
 import Raycaster from "./pages/raycaster";
+import Portal from "./pages/portal";
 import Laboratorio1 from "./pages/Laboratorio1";
 
 
@@ -34,6 +35,7 @@ const routes = [
   // Practicas 2
   { path: "modelos", element: <Modelos/> },
   { path: "raycaster", element: <Raycaster/>   },
+  { path: "portal", element: <Portal/>  },
   { path: "laboratorio1", element: <Laboratorio1 /> },
 
 ];
